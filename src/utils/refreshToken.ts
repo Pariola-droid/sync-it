@@ -18,6 +18,10 @@ async function refreshSpotifyToken(token: JWT): Promise<RefreshTokenResponse> {
     }),
   });
 
+  if (!response.ok) {
+    throw new Error(`Spotify token refresh failed: ${response.statusText}`);
+  }
+
   return response.json();
 }
 
@@ -33,6 +37,10 @@ async function refreshGoogleToken(token: JWT): Promise<RefreshTokenResponse> {
     }),
   });
 
+  if (!response.ok) {
+    throw new Error(`Google token refresh failed: ${response.statusText}`);
+  }
+
   return response.json();
 }
 
@@ -44,6 +52,10 @@ async function refreshAppleToken(token: JWT): Promise<RefreshTokenResponse> {
 
 export async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
+    if (!token.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
     let refreshedTokens: RefreshTokenResponse;
 
     switch (token.provider) {
@@ -75,6 +87,7 @@ export async function refreshAccessToken(token: JWT): Promise<JWT> {
     return {
       ...token,
       error: 'RefreshAccessTokenError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }

@@ -3,7 +3,6 @@
 import { PlaylistPlatforms } from '@/libs/platforms';
 import { IPlaylistPlatform } from '@/types/utils/platform';
 
-import { useAuthStore } from '@/store/useAuthStore';
 import { usePlaylistStore } from '@/store/usePlaylistStore';
 import { styled } from '@/styles';
 import { signIn, useSession } from 'next-auth/react';
@@ -15,16 +14,22 @@ export default function ChooseDestinationPage() {
   const router = useRouter();
   const { playlistSource, setPlaylistDestination, playlistDestination } =
     usePlaylistStore();
-  const { spotifyAuth, youtubeAuth, setSpotifyAuth, setYoutubeAuth } =
-    useAuthStore();
 
-  const handleDestinationSelect = async (platform: 'youtube') => {
-    setPlaylistDestination(platform);
+  const handleDestinationSelect = async (platform: string) => {
+    if (platform === playlistSource) {
+      return;
+    }
 
-    if (platform === 'youtube' && session?.provider !== 'google') {
-      await signIn('google', { callbackUrl: '/sync/summary' });
-    } else {
+    if (session?.provider === platform && session?.role === 'destination') {
+      // If already authenticated with this platform as destination, proceed
+      setPlaylistDestination(platform);
       router.push('/sync/summary');
+    } else {
+      // Initiate authentication for the selected platform
+      await signIn(platform, {
+        callbackUrl: `/api/auth/callback/${platform}`,
+        redirect: false,
+      });
     }
   };
 

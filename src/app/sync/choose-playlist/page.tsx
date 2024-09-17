@@ -13,8 +13,8 @@ import { useCallback } from 'react';
 interface IPlaylist {
   id: string;
   name: string;
-  images: { url: string }[];
-  tracks: { total: number };
+  images: any[];
+  trackCount: string;
 }
 
 export default function ChoosePlaylistPage() {
@@ -150,7 +150,8 @@ const PlaylistButton = styled('button', {
   variants: {
     selected: {
       true: {
-        backgroundColor: '#f2f2f2',
+        backgroundColor: '$ghostWhite',
+        borderColor: '#06060615',
       },
     },
   },
