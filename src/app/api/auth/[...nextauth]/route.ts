@@ -59,7 +59,6 @@ export const authOptions: NextAuthOptions = {
       //   return refreshAccessToken(token);
       // }
 
-      // return token;
       if (Date.now() < token.expiresAt * 1000) {
         return token;
       }
