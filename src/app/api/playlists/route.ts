@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '../auth/[...nextauth]/route';
 
 async function fetchSpotifyPlaylists(accessToken: string) {
@@ -46,34 +46,46 @@ async function fetchYouTubeMusicPlaylists(accessToken: string) {
   return response.json();
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
   console.log('Session in API route:', session);
 
-  if (!session || !session.accessToken || !session.provider) {
+  if (!session || !session.providers) {
     console.error('Unauthorized access attempt:', {
       hasSession: !!session,
-      hasAccessToken: !!session?.accessToken,
-      provider: session?.provider,
+      hasProviders: !!session?.providers,
     });
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Get the provider from the query string
+  const url = new URL(request.url);
+  const provider = url.searchParams.get('provider');
+
+  if (!provider || !session.providers[provider]) {
+    return NextResponse.json(
+      { error: 'Invalid or missing provider' },
+      { status: 400 }
+    );
+  }
+
+  const accessToken = session.providers[provider].accessToken;
+
   try {
     let data;
-    switch (session.provider) {
+    switch (provider) {
       case 'spotify':
-        data = await fetchSpotifyPlaylists(session.accessToken);
+        data = await fetchSpotifyPlaylists(accessToken);
         break;
       case 'apple':
-        data = await fetchAppleMusicPlaylists(session.accessToken);
+        data = await fetchAppleMusicPlaylists(accessToken);
         break;
       case 'google':
-        data = await fetchYouTubeMusicPlaylists(session.accessToken);
+        data = await fetchYouTubeMusicPlaylists(accessToken);
         break;
       default:
-        throw new Error(`Unsupported provider: ${session.provider}`);
+        throw new Error(`Unsupported provider: ${provider}`);
     }
 
     return NextResponse.json(data);

@@ -5,20 +5,47 @@ import { IPlaylistPlatform } from '@/types/utils/platform';
 
 import { usePlaylistStore } from '@/store/usePlaylistStore';
 import { styled } from '@/styles';
+import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function ChooseDestinationPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { playlistSource, setPlaylistDestination, playlistDestination } =
     usePlaylistStore();
 
+  // const handleDestinationSelect = async (platform: string) => {
+  //   if (platform === playlistSource) {
+  //     return;
+  //   }
+
+  //   if (session?.providers && session.providers[platform]) {
+  //     setPlaylistDestination(platform);
+  //     router.push('/sync/summary');
+  //   } else {
+  //     await signIn(platform, { callbackUrl: '/sync/choose-destination' });
+  //   }
+  // };
   const handleDestinationSelect = async (platform: string) => {
     if (platform === playlistSource) {
+      // Can't select the same platform as source and destination
       return;
-    } else {
+    }
+
+    if (session?.providers && session.providers[platform]) {
+      // Already authenticated with this platform
       setPlaylistDestination(platform);
       router.push('/sync/summary');
+    } else {
+      // Need to authenticate with this platform
+      const result = await signIn(platform, { redirect: false });
+      if (result?.error) {
+        console.error('Authentication failed:', result.error);
+      } else {
+        setPlaylistDestination(platform);
+        router.push('/sync/summary');
+      }
     }
   };
 
@@ -45,9 +72,9 @@ export default function ChooseDestinationPage() {
               <SelectSourceButton className="select-source-button">
                 {playlistSource === source.platform
                   ? 'Selected source'
-                  : (playlistDestination === source.platform &&
-                      'Selected destination') ||
-                    `Select ${source.name}`}
+                  : session?.providers && session.providers[source.platform]
+                  ? `Continue with ${source.name}`
+                  : `Connect ${source.name}`}
               </SelectSourceButton>
             </FixedHoverHeight>
           </SourceOptionMain>

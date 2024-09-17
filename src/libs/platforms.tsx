@@ -19,7 +19,7 @@ export const PlaylistPlatforms: IPlaylistPlatform[] = [
     image: AppleMusicLogo,
   },
   {
-    platform: 'youtube',
+    platform: 'google',
     name: 'YTmusic',
     image: YoutubeMusicLogo,
   },

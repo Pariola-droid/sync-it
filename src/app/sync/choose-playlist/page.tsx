@@ -20,7 +20,8 @@ interface IPlaylist {
 export default function ChoosePlaylistPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const { selectedPlaylistId, setSelectedPlaylistId } = usePlaylistStore();
+  const { selectedPlaylistId, setSelectedPlaylistId, playlistSource } =
+    usePlaylistStore();
 
   const formatPlaylists = useCallback((rawData: any, provider: string) => {
     switch (provider) {
@@ -55,7 +56,8 @@ export default function ChoosePlaylistPage() {
     isLoading,
     error,
   } = usePlaylistQuery({
-    enabled: !!session?.accessToken,
+    enabled: !!session?.providers && !!playlistSource,
+    provider: playlistSource,
   });
 
   const handlePlaylistSelect = (playlistId: string) => {
@@ -67,8 +69,7 @@ export default function ChoosePlaylistPage() {
   if (isLoading) return <div>Loading playlists...</div>;
   if (error) return <div>Error fetching playlists</div>;
 
-  const playlists = formatPlaylists(rawPlaylists, session?.provider as string);
-  console.log(rawPlaylists, 'playlists raw');
+  const playlists = formatPlaylists(rawPlaylists, playlistSource);
 
   return (
     <ChoosePlaylistSection>

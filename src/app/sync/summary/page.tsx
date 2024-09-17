@@ -5,7 +5,7 @@ import { usePlaylistStore } from '@/store/usePlaylistStore';
 import { styled } from '@/styles';
 import { useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -36,7 +36,7 @@ export default function SyncSummaryPage() {
 
   useEffect(() => {
     if (!selectedPlaylistId || !playlistSource || !playlistDestination) {
-      router.back();
+      router.push('/sync/choose-source');
     }
   }, [selectedPlaylistId, playlistSource, playlistDestination, router]);
 
@@ -44,8 +44,8 @@ export default function SyncSummaryPage() {
     data: playlistDetails,
     isLoading,
     error,
-  } = usePlaylistDetailsQuery(selectedPlaylistId!, {
-    enabled: !!playlistSource && !!session,
+  } = usePlaylistDetailsQuery(selectedPlaylistId!, playlistSource, {
+    enabled: !!playlistSource && !!session?.providers?.[playlistSource],
   });
 
   console.log('playlistDetails:', playlistDetails);
@@ -63,8 +63,11 @@ export default function SyncSummaryPage() {
   });
 
   const handleSync = async () => {
-    if (!session) {
-      await signIn();
+    if (
+      !session?.providers?.[playlistSource] ||
+      !session?.providers?.[playlistDestination]
+    ) {
+      console.error('Not authenticated with both platforms');
       return;
     }
 
@@ -79,15 +82,58 @@ export default function SyncSummaryPage() {
   if (isLoading) return <div>Loading playlist details...</div>;
   if (error) return <div>Error fetching playlist details</div>;
 
+  const getPlaylistImage = () => {
+    switch (playlistSource) {
+      case 'spotify':
+        return playlistDetails?.images?.[0]?.url;
+      case 'google':
+        return playlistDetails?.items?.[0]?.snippet?.thumbnails?.default?.url;
+      default:
+        return null;
+    }
+  };
+
+  const getPlaylistName = () => {
+    switch (playlistSource) {
+      case 'spotify':
+        return playlistDetails?.name;
+      case 'google':
+        return playlistDetails?.items?.[0]?.snippet?.title;
+      default:
+        return 'Unknown';
+    }
+  };
+
+  const getTrackCount = () => {
+    switch (playlistSource) {
+      case 'spotify':
+        return playlistDetails?.tracks?.total;
+      case 'google':
+        return 'N/A';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  const getExternalUrl = () => {
+    switch (playlistSource) {
+      case 'spotify':
+        return playlistDetails?.external_urls?.spotify;
+      case 'google':
+        return `https://www.youtube.com/playlist?list=${selectedPlaylistId}`;
+      default:
+        return '#';
+    }
+  };
+
   return (
     <SyncSummarySection>
       <PlaylistSummarySection>
         <ImageSlot whileHover={{ scale: 1.05 }} transition={{ duration: 0.3 }}>
-          {playlistDetails?.data.images &&
-          playlistDetails?.data.images.length > 0 ? (
+          {getPlaylistImage() ? (
             <Image
-              src={playlistDetails.data.images[0].url}
-              alt={playlistDetails.data.name}
+              src={getPlaylistImage()!}
+              alt={getPlaylistName()}
               width={140}
               height={140}
             />
@@ -97,19 +143,19 @@ export default function SyncSummaryPage() {
         </ImageSlot>
         <PlaylistMeta>
           <p>
-            Tracks: <span>{playlistDetails?.data.tracks?.total}</span>
+            Tracks: <span>{getTrackCount()}</span>
           </p>
           <p>
             Platform: <span>{playlistSource}</span>
           </p>
           <p>
-            Playlist: <span>{playlistDetails?.data.name}</span>
+            Playlist: <span>{getPlaylistName()}</span>
           </p>
           <p>
             Source:{' '}
             <span>
               <a
-                href={playlistDetails?.data.external_urls.spotify}
+                href={getExternalUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
               >

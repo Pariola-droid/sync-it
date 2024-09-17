@@ -15,7 +15,7 @@ export default function ChooseSourcePage() {
   const { setPlaylistSource } = usePlaylistStore();
 
   const handleSourceSelect = async (platform: string) => {
-    if (session && session.provider === platform) {
+    if (session?.providers && session.providers[platform]) {
       setPlaylistSource(platform);
       router.push('/sync/choose-playlist');
     } else {
@@ -41,7 +41,7 @@ export default function ChooseSourcePage() {
                 />
               </SourceMeta>
               <SelectSourceButton className="select-source-button">
-                {session && session.provider === source.platform
+                {session?.providers && session.providers[source.platform]
                   ? `Continue with ${source.name}`
                   : `Connect ${source.name}`}
               </SelectSourceButton>

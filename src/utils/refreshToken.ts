@@ -1,93 +1,78 @@
-import { JWT } from 'next-auth/jwt';
+import { TokenSet } from 'next-auth';
 
-interface RefreshTokenResponse {
-  access_token: string;
-  expires_in: number;
-  refresh_token?: string;
-}
-
-async function refreshSpotifyToken(token: JWT): Promise<RefreshTokenResponse> {
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.SPOTIFY_CLIENT_ID!,
-      client_secret: process.env.SPOTIFY_CLIENT_SECRET!,
-      grant_type: 'refresh_token',
-      refresh_token: token.refreshToken as string,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Spotify token refresh failed: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-async function refreshGoogleToken(token: JWT): Promise<RefreshTokenResponse> {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      grant_type: 'refresh_token',
-      refresh_token: token.refreshToken as string,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Google token refresh failed: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-async function refreshAppleToken(token: JWT): Promise<RefreshTokenResponse> {
-  // Apple's refresh token process is different and may require additional steps
-  // This is a placeholder and needs to be implemented according to Apple's specifications
-  throw new Error('Apple token refresh not implemented');
-}
-
-export async function refreshAccessToken(token: JWT): Promise<JWT> {
+export async function refreshAccessToken(
+  token: TokenSet,
+  provider: string
+): Promise<TokenSet> {
   try {
-    if (!token.refreshToken) {
-      throw new Error('No refresh token available');
-    }
+    const url = getRefreshUrl(provider);
+    const payload = getRefreshPayload(provider, token.refreshToken as string);
 
-    let refreshedTokens: RefreshTokenResponse;
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      method: 'POST',
+      body: new URLSearchParams(payload),
+    });
 
-    switch (token.provider) {
-      case 'spotify':
-        refreshedTokens = await refreshSpotifyToken(token);
-        break;
-      case 'google':
-        refreshedTokens = await refreshGoogleToken(token);
-        break;
-      case 'apple':
-        refreshedTokens = await refreshAppleToken(token);
-        break;
-      default:
-        throw new Error(`Unsupported provider: ${token.provider}`);
-    }
+    const refreshedTokens = await response.json();
 
-    if (!refreshedTokens.access_token) {
-      throw new Error('Failed to refresh access token');
+    if (!response.ok) {
+      throw refreshedTokens;
     }
 
     return {
       ...token,
       accessToken: refreshedTokens.access_token,
-      expiresAt: Math.floor(Date.now() / 1000 + refreshedTokens.expires_in),
+      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     };
   } catch (error) {
-    console.error('Error refreshing access token', error);
+    console.error('RefreshAccessTokenError', error);
     return {
       ...token,
       error: 'RefreshAccessTokenError',
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
     };
+  }
+}
+
+function getRefreshUrl(provider: string): string {
+  switch (provider) {
+    case 'spotify':
+      return 'https://accounts.spotify.com/api/token';
+    case 'google':
+      return 'https://oauth2.googleapis.com/token';
+
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
+  }
+}
+
+function getRefreshPayload(
+  provider: string,
+  refreshToken: string
+): Record<string, string> {
+  const basePayload = {
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  };
+
+  switch (provider) {
+    case 'spotify':
+      return {
+        ...basePayload,
+        client_id: process.env.SPOTIFY_CLIENT_ID!,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET!,
+      };
+    case 'google':
+      return {
+        ...basePayload,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      };
+
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
   }
 }

@@ -15,7 +15,8 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'user-read-private user-read-email playlist-read-private',
+          scope:
+            'user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private',
         },
       },
     }),
@@ -41,22 +42,28 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account, user }) {
       if (account && user) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
-        token.provider = account.provider;
+        token.providers = token.providers || {};
+        token.providers[account.provider] = {
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          expiresAt: account.expires_at,
+        };
       }
 
-      if (token.expiresAt && Date.now() > Number(token.expiresAt) * 1000) {
-        return refreshAccessToken(token);
+      // Check and refresh tokens for all providers
+      if (token.providers) {
+        for (const [provider, data] of Object.entries(token.providers)) {
+          if (data.expiresAt && Date.now() > data.expiresAt * 1000) {
+            const refreshedToken = await refreshAccessToken(data, provider);
+            token.providers[provider] = refreshedToken;
+          }
+        }
       }
 
-      return refreshAccessToken(token);
+      return token;
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken as string;
-      session.provider = token.provider as string;
-      session.error = token.error as string | undefined;
+      session.providers = token.providers;
       return session;
     },
   },

@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '../../auth/[...nextauth]/route';
 
 async function fetchSpotifyPlaylistDetails(
@@ -12,11 +12,8 @@ async function fetchSpotifyPlaylistDetails(
       headers: { Authorization: `Bearer ${accessToken}` },
     }
   );
-
-  if (!response.ok) {
+  if (!response.ok)
     throw new Error(`Spotify API responded with status ${response.status}`);
-  }
-
   return response.json();
 }
 
@@ -27,51 +24,51 @@ async function fetchYouTubeMusicPlaylistsDetails(
   const response = await fetch(
     `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}`,
     {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     }
   );
-
-  if (!response.ok) {
+  if (!response.ok)
     throw new Error(`YouTube API responded with status ${response.status}`);
-  }
-
   return response.json();
 }
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { playlistId: string } }
 ) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.accessToken) {
+  if (!session || !session.providers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const playlistId = params.playlistId;
+  const url = new URL(request.url);
+  const provider = url.searchParams.get('provider');
+
+  if (!provider || !session.providers[provider]) {
+    return NextResponse.json(
+      { error: 'Invalid or missing provider' },
+      { status: 400 }
+    );
+  }
+
+  const accessToken = session.providers[provider].accessToken;
 
   try {
     let data;
-    switch (session.provider) {
+    switch (provider) {
       case 'spotify':
-        data = await fetchSpotifyPlaylistDetails(
-          playlistId,
-          session.accessToken
-        );
+        data = await fetchSpotifyPlaylistDetails(playlistId, accessToken);
         break;
       case 'apple':
         data = 'Apple Music playlists are not supported';
         break;
       case 'google':
-        data = await fetchYouTubeMusicPlaylistsDetails(
-          playlistId,
-          session.accessToken
-        );
+        data = await fetchYouTubeMusicPlaylistsDetails(playlistId, accessToken);
         break;
       default:
-        throw new Error(`Unsupported provider: ${session.provider}`);
+        throw new Error(`Unsupported provider: ${provider}`);
     }
 
     return NextResponse.json(data);
