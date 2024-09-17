@@ -39,43 +39,24 @@ export const authOptions: NextAuthOptions = {
   ],
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
-    async jwt({ token, account, user, profile }) {
+    async jwt({ token, account, user }) {
       if (account && user) {
-        // token.accessToken = account.access_token;
-        // token.refreshToken = account.refresh_token;
-        // token.expiresAt = account.expires_at;
-        // token.provider = account.provider;
-        return {
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token,
-          expiresAt: account.expires_at,
-          provider: account.provider,
-          userId: profile.id,
-          role: 'source',
-        };
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.expiresAt = account.expires_at;
+        token.provider = account.provider;
       }
 
-      // if (token.expiresAt && Date.now() > token.expiresAt * 1000) {
-      //   return refreshAccessToken(token);
-      // }
-
-      // return token;
-      if (Date.now() < token.expiresAt * 1000) {
-        return token;
+      if (token.expiresAt && Date.now() > Number(token.expiresAt) * 1000) {
+        return refreshAccessToken(token);
       }
 
       return refreshAccessToken(token);
     },
     async session({ session, token }) {
-      // session.accessToken = token.accessToken as string;
-      // session.provider = token.provider as string;
-      // session.error = token.error as string | undefined;
-      // return session;
       session.accessToken = token.accessToken as string;
       session.provider = token.provider as string;
       session.error = token.error as string | undefined;
-      session.userId = token.userId as string;
-      session.role = token.role as string;
       return session;
     },
   },

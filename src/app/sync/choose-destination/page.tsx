@@ -5,12 +5,10 @@ import { IPlaylistPlatform } from '@/types/utils/platform';
 
 import { usePlaylistStore } from '@/store/usePlaylistStore';
 import { styled } from '@/styles';
-import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function ChooseDestinationPage() {
-  const { data: session } = useSession();
   const router = useRouter();
   const { playlistSource, setPlaylistDestination, playlistDestination } =
     usePlaylistStore();
@@ -18,18 +16,9 @@ export default function ChooseDestinationPage() {
   const handleDestinationSelect = async (platform: string) => {
     if (platform === playlistSource) {
       return;
-    }
-
-    if (session?.provider === platform && session?.role === 'destination') {
-      // If already authenticated with this platform as destination, proceed
+    } else {
       setPlaylistDestination(platform);
       router.push('/sync/summary');
-    } else {
-      // Initiate authentication for the selected platform
-      await signIn(platform, {
-        callbackUrl: `/api/auth/callback/${platform}`,
-        redirect: false,
-      });
     }
   };
 

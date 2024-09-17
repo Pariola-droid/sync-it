@@ -77,7 +77,7 @@ export async function GET() {
     }
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching playlists:', error);
     return NextResponse.json(
       { error: 'Failed to fetch playlists', details: error.message },

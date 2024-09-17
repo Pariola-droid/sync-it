@@ -8,3 +8,11 @@ export const usePlaylistQuery = (args: any) => {
     ...args,
   });
 };
+
+export const usePlaylistDetailsQuery = (playlistId: string, args: any) => {
+  return useQuery({
+    queryKey: ['playlistDetails', playlistId],
+    queryFn: () => request.get(`/playlists/${playlistId}`),
+    ...args,
+  });
+};
