@@ -56,7 +56,8 @@ export default function ChoosePlaylistPage() {
     isLoading,
     error,
   } = usePlaylistQuery({
-    enabled: !!session?.providers && !!playlistSource,
+    enabled:
+      !!session?.providers?.[playlistSource]?.accessToken && !!playlistSource,
     provider: playlistSource,
   });
 
@@ -67,7 +68,8 @@ export default function ChoosePlaylistPage() {
   };
 
   if (isLoading) return <div>Loading playlists...</div>;
-  if (error) return <div>Error fetching playlists</div>;
+  if (error)
+    return <div>Error fetching playlists: {(error as Error).message}</div>;
 
   const playlists = formatPlaylists(rawPlaylists, playlistSource);
 

@@ -49,17 +49,10 @@ async function fetchYouTubeMusicPlaylists(accessToken: string) {
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  console.log('Session in API route:', session);
-
-  if (!session || !session.providers) {
-    console.error('Unauthorized access attempt:', {
-      hasSession: !!session,
-      hasProviders: !!session?.providers,
-    });
+  if (!session?.providers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Get the provider from the query string
   const url = new URL(request.url);
   const provider = url.searchParams.get('provider');
 

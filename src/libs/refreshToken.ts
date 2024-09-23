@@ -1,39 +1,52 @@
-import { TokenSet } from 'next-auth';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function refreshAccessToken(
-  token: TokenSet,
+  userId: string,
   provider: string
-): Promise<TokenSet> {
+): Promise<void> {
   try {
+    const { data: connection } = await supabase
+      .from('user_platform_connections')
+      .select('refresh_token')
+      .eq('user_id', userId)
+      .eq('platform', provider)
+      .single();
+
+    if (!connection) throw new Error('No connection found');
+
     const url = getRefreshUrl(provider);
-    const payload = getRefreshPayload(provider, token.refreshToken as string);
+    const payload = getRefreshPayload(provider, connection.refresh_token);
 
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       method: 'POST',
       body: new URLSearchParams(payload),
     });
 
     const refreshedTokens = await response.json();
 
-    if (!response.ok) {
-      throw refreshedTokens;
-    }
+    if (!response.ok) throw refreshedTokens;
 
-    return {
-      ...token,
-      accessToken: refreshedTokens.access_token,
-      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
-      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
-    };
+    await supabase
+      .from('user_platform_connections')
+      .update({
+        access_token: refreshedTokens.access_token,
+        refresh_token:
+          refreshedTokens.refresh_token || connection.refresh_token,
+        expires_at: new Date(
+          Date.now() + refreshedTokens.expires_in * 1000
+        ).toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('platform', provider);
   } catch (error) {
     console.error('RefreshAccessTokenError', error);
-    return {
-      ...token,
-      error: 'RefreshAccessTokenError',
-    };
+    throw error;
   }
 }
 

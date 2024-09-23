@@ -5,46 +5,69 @@ import { IPlaylistPlatform } from '@/types/utils/platform';
 
 import { usePlaylistStore } from '@/store/usePlaylistStore';
 import { styled } from '@/styles';
+import { createClient } from '@supabase/supabase-js';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function ChooseDestinationPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const { playlistSource, setPlaylistDestination, playlistDestination } =
     usePlaylistStore();
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
 
-  // const handleDestinationSelect = async (platform: string) => {
-  //   if (platform === playlistSource) {
-  //     return;
-  //   }
+  useEffect(() => {
+    async function fetchConnectedPlatforms() {
+      if (session?.user?.id) {
+        const { data, error } = await supabase
+          .from('user_platform_connections')
+          .select('platform')
+          .eq('user_id', session.user.id);
 
-  //   if (session?.providers && session.providers[platform]) {
-  //     setPlaylistDestination(platform);
-  //     router.push('/sync/summary');
-  //   } else {
-  //     await signIn(platform, { callbackUrl: '/sync/choose-destination' });
-  //   }
-  // };
+        if (error) {
+          console.error('Error fetching connected platforms:', error);
+        } else {
+          setConnectedPlatforms(data.map((conn) => conn.platform));
+        }
+      }
+    }
+
+    fetchConnectedPlatforms();
+  }, [session]);
+
+  console.log('connectedPlatforms:', connectedPlatforms);
+
   const handleDestinationSelect = async (platform: string) => {
     if (platform === playlistSource) {
       // Can't select the same platform as source and destination
       return;
     }
 
-    if (session?.providers && session.providers[platform]) {
+    if (connectedPlatforms.includes(platform)) {
       // Already authenticated with this platform
       setPlaylistDestination(platform);
       router.push('/sync/summary');
     } else {
       // Need to authenticate with this platform
-      const result = await signIn(platform, { redirect: false });
-      if (result?.error) {
-        console.error('Authentication failed:', result.error);
-      } else {
+      try {
+        const result = await signIn(platform, { redirect: false });
+        if (result?.error) {
+          throw new Error(result.error);
+        }
+        // Update the session to reflect the new authentication
+        await updateSession();
         setPlaylistDestination(platform);
         router.push('/sync/summary');
+      } catch (error) {
+        console.error('Authentication failed:', error);
+        // Handle the error (e.g., show an error message to the user)
       }
     }
   };
@@ -72,7 +95,7 @@ export default function ChooseDestinationPage() {
               <SelectSourceButton className="select-source-button">
                 {playlistSource === source.platform
                   ? 'Selected source'
-                  : session?.providers && session.providers[source.platform]
+                  : connectedPlatforms.includes(source.platform)
                   ? `Continue with ${source.name}`
                   : `Connect ${source.name}`}
               </SelectSourceButton>

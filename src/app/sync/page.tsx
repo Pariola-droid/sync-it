@@ -5,23 +5,56 @@ import { PlaylistPlatforms } from '../../libs/platforms';
 
 import { usePlaylistStore } from '@/store/usePlaylistStore';
 import { styled } from '@/styles';
+import { createClient } from '@supabase/supabase-js';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function ChooseSourcePage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const { setPlaylistSource } = usePlaylistStore();
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function fetchConnectedPlatforms() {
+      if (session?.user?.id) {
+        const { data, error } = await supabase
+          .from('user_platform_connections')
+          .select('platform')
+          .eq('user_id', session.user.id);
+
+        if (error) {
+          console.error('Error fetching connected platforms:', error);
+        } else {
+          setConnectedPlatforms(data.map((conn) => conn.platform));
+        }
+      }
+    }
+
+    fetchConnectedPlatforms();
+  }, [session]);
+
+  console.log('connectedPlatforms:', connectedPlatforms);
 
   const handleSourceSelect = async (platform: string) => {
-    if (session?.providers && session.providers[platform]) {
+    if (connectedPlatforms.includes(platform)) {
       setPlaylistSource(platform);
       router.push('/sync/choose-playlist');
     } else {
       await signIn(platform, { callbackUrl: '/sync/choose-playlist' });
     }
   };
+
+  if (status === 'loading') {
+    return <div>Loading...</div>;
+  }
 
   return (
     <SourceGridSection>
@@ -41,7 +74,7 @@ export default function ChooseSourcePage() {
                 />
               </SourceMeta>
               <SelectSourceButton className="select-source-button">
-                {session?.providers && session.providers[source.platform]
+                {connectedPlatforms.includes(source.platform)
                   ? `Continue with ${source.name}`
                   : `Connect ${source.name}`}
               </SelectSourceButton>
